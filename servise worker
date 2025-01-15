@@ -1,0 +1,107 @@
+// service-worker.js
+const CACHE_NAME = 'pushup-tracker-v1';
+const urlsToCache = [
+    '/',
+    '/index.html',
+    '/app.js',
+    '/manifest.json',
+    '/icon-192x192.png',
+    '/icon-512x512.png',
+    'https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css',
+    'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js'
+];
+
+self.addEventListener('install', event => {
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then(cache => cache.addAll(urlsToCache))
+    );
+});
+
+self.addEventListener('fetch', event => {
+    event.respondWith(
+        caches.match(event.request)
+            .then(response => response || fetch(event.request))
+    );
+});
+
+// app.js
+const { useState, useEffect } = React;
+
+function PushupTracker() {
+    const [weeklyData, setWeeklyData] = useState(() => {
+        const saved = localStorage.getItem('pushupData');
+        if (saved) {
+            return JSON.parse(saved);
+        }
+        return [
+            { day: 'Monday', pushups: 0 },
+            { day: 'Tuesday', pushups: 0 },
+            { day: 'Wednesday', pushups: 0 },
+            { day: 'Thursday', pushups: 0 },
+            { day: 'Friday', pushups: 0 },
+            { day: 'Saturday', pushups: 0 },
+            { day: 'Sunday', pushups: 0 },
+        ];
+    });
+
+    useEffect(() => {
+        localStorage.setItem('pushupData', JSON.stringify(weeklyData));
+    }, [weeklyData]);
+
+    const adjustPushups = (index, increment) => {
+        setWeeklyData(prevData => {
+            const newData = [...prevData];
+            newData[index] = {
+                ...newData[index],
+                pushups: Math.max(0, newData[index].pushups + (increment ? 1 : -1))
+            };
+            return newData;
+        });
+    };
+
+    const totalPushups = weeklyData.reduce((sum, day) => sum + day.pushups, 0);
+    const avgPushups = (totalPushups / 7).toFixed(1);
+
+    return React.createElement('div', { className: 'max-w-md mx-auto p-4' },
+        React.createElement('h1', { className: 'text-2xl font-bold text-center mb-6' }, 'Push-up Tracker'),
+        React.createElement('div', { className: 'grid grid-cols-2 gap-4 mb-6' },
+            weeklyData.map((day, index) => 
+                React.createElement('div', { 
+                    key: day.day,
+                    className: 'bg-white rounded-lg shadow p-4'
+                },
+                    React.createElement('div', { className: 'font-medium' }, day.day),
+                    React.createElement('div', { className: 'text-2xl font-bold mb-2' }, day.pushups),
+                    React.createElement('div', { className: 'flex gap-2' },
+                        React.createElement('button', {
+                            onClick: () => adjustPushups(index, true),
+                            className: 'bg-blue-500 text-white px-3 py-1 rounded'
+                        }, '+'),
+                        React.createElement('button', {
+                            onClick: () => adjustPushups(index, false),
+                            className: 'bg-red-500 text-white px-3 py-1 rounded',
+                            disabled: day.pushups === 0
+                        }, '-')
+                    )
+                )
+            )
+        ),
+        React.createElement('div', { className: 'grid grid-cols-2 gap-4' },
+            React.createElement('div', { className: 'bg-blue-100 rounded-lg p-4 text-center' },
+                React.createElement('div', { className: 'text-sm text-gray-600' }, 'Total'),
+                React.createElement('div', { className: 'text-2xl font-bold' }, totalPushups)
+            ),
+            React.createElement('div', { className: 'bg-blue-100 rounded-lg p-4 text-center' },
+                React.createElement('div', { className: 'text-sm text-gray-600' }, 'Daily Average'),
+                React.createElement('div', { className: 'text-2xl font-bold' }, avgPushups)
+            )
+        )
+    );
+}
+
+ReactDOM.render(
+    React.createElement(PushupTracker),
+    document.getElementById('root')
+);
